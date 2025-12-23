@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Fake News Detector — MVP</title>
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial; padding: 2rem; max-width: 760px; margin: auto; }
+    h1 { margin-bottom: 0.25rem }
+    p.lead { color: #555; margin-top: 0; }
+    textarea { width: 100%; height: 140px; font-size: 1rem; padding: 0.5rem; }
+    button { padding: 0.6rem 1rem; font-size: 1rem; }
+    .result { margin-top: 1rem; padding: 1rem; border-radius: 6px; }
+    .fake { background: #fff0f0; border: 1px solid #ff8a8a; color: #a00 }
+    .real { background: #f0fff6; border: 1px solid #8affb3; color: #046 }
+    .example { margin-top: 0.6rem; color: #444 }
+    footer { margin-top: 3rem; color: #666; font-size: 0.9rem }
+  </style>
+</head>
+<body>
+  <h1>Fake News Detector — MVP</h1>
+  <p class="lead">Paste a headline or snippet and click "Predict". This runs the lightweight serverless rule-based predictor (suitable for Vercel deployment).</p>
+
+  <label for="text">Text</label>
+  <textarea id="text" placeholder="Enter the news text or headline..."></textarea>
+  <div style="margin-top:.5rem">
+    <button id="btn">Predict</button>
+    <button id="sample" style="margin-left:.5rem">Use sample fake</button>
+    <button id="sample2" style="margin-left:.5rem">Use sample real</button>
+  </div>
+
+  <div id="out" style="margin-top:1rem"></div>
+
+  <div class="example">
+    Example fake: "This one weird trick doctors hate — cure for diabetes!"<br>
+    Example real: "Council approves funding for new park, officials said"
+  </div>
+
+  <footer>
+    Running on Vercel? Deploy this repo and the site will be available at the root and the API at /api/predict.
+  </footer>
+
+  <script>
+    const elText = document.getElementById('text')
+    const btn = document.getElementById('btn')
+    const out = document.getElementById('out')
+    const sample = document.getElementById('sample')
+    const sample2 = document.getElementById('sample2')
+
+    sample.addEventListener('click', () => {
+      elText.value = 'This one weird trick doctors hate — cure for diabetes!'
+    })
+    sample2.addEventListener('click', () => {
+      elText.value = 'Council approves funding for new park, officials said'
+    })
+
+    async function predict() {
+      out.innerHTML = ''
+      const text = elText.value.trim()
+      if (!text) {
+        out.innerHTML = '<div class="result" style="background:#fff8e6;border:1px solid #ffd58a">Please enter some text</div>'
+        return
+      }
+      btn.disabled = true
+      btn.textContent = 'Predicting...'
+      try {
+        const resp = await fetch('/api/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        })
+        const data = await resp.json()
+        if (!resp.ok) throw new Error(data.error || 'Request failed')
+        const cls = data.label === 'FAKE' ? 'fake' : 'real'
+        out.innerHTML = `<div class="result ${cls}"><strong>${data.label}</strong> — score: ${Number(data.score).toFixed(2)}</div>`
+      } catch (err) {
+        out.innerHTML = `<div class="result" style="background:#fff0f0;border:1px solid #ff8a8a;color:#a00">Error: ${err.message}</div>`
+      } finally {
+        btn.disabled = false
+        btn.textContent = 'Predict'
+      }
+    }
+
+    btn.addEventListener('click', predict)
+
+    // allow Ctrl+Enter to submit
+    elText.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') predict()
+    })
+  </script>
+</body>
+</html>
